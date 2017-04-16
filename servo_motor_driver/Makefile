@@ -1,4 +1,4 @@
-TARGET_MODULE:=pwm_servo
+TARGET_MODULE:=pwm_driver
 
 obj-m+=$(TARGET_MODULE).o
 
