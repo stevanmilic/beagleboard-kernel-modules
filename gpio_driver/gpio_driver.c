@@ -13,6 +13,7 @@ static ssize_t __init gpio_driver_init(void)
 	for (i = 0; i < GPIOS_LEN; i++) {
 		gpios[i].exported = 0;
 		gpios[i].id = i;
+		gpios[i].value = 0;
 	}
 
 	return 0;
@@ -120,18 +121,14 @@ static int dev_open(struct inode *inodep, struct file *filep)
 
 static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset)
 {
-	int error_count, size_of_message, i;
+	int error_count, size_of_message;
 	char message[256] = {0};
 
 	if (is_read == 1) {
 		return (is_read = 0);
 	}
 
-	for (i = 0; i < GPIOS_LEN; i++) {
-		if (gpios[i].exported) {
-			sprintf(message + strlen(message), "%u %u %u\n", gpios[i].id, gpios[i].value, gpios[i].direction);
-		}
-	}
+	sprintf(message, "%u", gpio_value);
 	size_of_message = strlen(message) + 1;
 
 	error_count = copy_to_user(buffer, message, size_of_message);
@@ -150,7 +147,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 {
 	int rc, error_count;
 	char message[256] = {0}, choice;
-	unsigned int id, value, direction;
+	unsigned int id, param;
 
 	error_count = copy_from_user(message, buffer, len);
 	if (error_count != 0) {
@@ -158,27 +155,33 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 		return -EFAULT;
 	}
 
-	sscanf(message, "%c %d %u %u", &choice, &id, &value, &direction);
+	sscanf(message, "%c %d %u", &choice, &id, &param);
 
 	if (id >= 65) {
 		return -EINVAL;
 	}
 
 	switch (choice) {
-	case 's':
-		gpios[id].id = id;
-		gpios[id].value = value;
-		gpios[id].direction = direction;
+	case 'i':
 		if (!gpios[id].exported) {
+			printk(KERN_INFO "BBGPIO: I am in the (i) branch\n");
+			gpios[id].direction = param;
 			rc = gpio_init(&gpios[id]);
-		} else {
-			gpio_set_value(gpios[id].id, gpios[id].value);
-		}
-		if (rc) {
-			return rc;
+			if (rc) {
+				return rc;
+			}
 		}
 		break;
-	case 'd':
+	case 'w':
+		gpios[id].value = param;
+		gpio_set_value(gpios[id].id, gpios[id].value);
+		break;
+	case 'r':
+		if (!gpios[id].direction) {
+			gpio_value = gpio_get_value(gpios[id].id);
+		}
+		break;
+	case 'f':
 		if (gpios[id].exported) {
 			gpio_exit(&gpios[id]);
 			gpios[id].exported = 0;

@@ -31,5 +31,7 @@ static void gpio_exit(struct Gpio *);
 
 static struct Gpio gpios[GPIOS_LEN];
 
-bool is_read = 0;
+static unsigned int gpio_value;
+static bool is_read = 0;
+
 #endif
