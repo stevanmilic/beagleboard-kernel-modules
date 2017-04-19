@@ -11,7 +11,6 @@ class Device(object):
     def read(name, no_bytes):
         """Method for reading from device"""
         device = os.open(Device._path(name), os.O_RDONLY)
-        # os.lseek(device, 0, os.SEEK_SET)
         output = os.read(device, no_bytes)
         os.close(device)
         return output

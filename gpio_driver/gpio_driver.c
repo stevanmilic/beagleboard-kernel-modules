@@ -124,23 +124,21 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	int error_count, size_of_message;
 	char message[256] = {0};
 
-	if (is_read == 1) {
-		return (is_read = 0);
-	}
-
 	sprintf(message, "%u", gpio_value);
 	size_of_message = strlen(message) + 1;
 
-	error_count = copy_to_user(buffer, message, size_of_message);
+	if (*offset >= size_of_message){
+			return 0;
+	}
 
-	if (error_count == 0) {
-		printk(KERN_INFO "BBGPIO: Sent %d character to the user\n", size_of_message);
-		is_read = 1;
-		return size_of_message;
-	} else {
+	error_count = copy_to_user(buffer, message, size_of_message);
+	if (error_count != 0) {
 		printk(KERN_INFO "BBGPIO: Failed to send %d characters to the user\n", error_count);
 		return -EFAULT;
 	}
+
+	*offset += size_of_message;
+	return size_of_message;
 }
 
 static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
@@ -173,12 +171,18 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 		}
 		break;
 	case 'w':
-		gpios[id].value = param;
-		gpio_set_value(gpios[id].id, gpios[id].value);
+		if (gpios[id].exported) {
+			gpios[id].value = param;
+			gpio_set_value(gpios[id].id, gpios[id].value);
+		}
 		break;
 	case 'r':
-		if (!gpios[id].direction) {
-			gpio_value = gpio_get_value(gpios[id].id);
+		if (gpios[id].exported) {
+			if (!gpios[id].direction) {
+				gpio_value = gpio_get_value(gpios[id].id);
+			} else {
+				gpio_value = gpios[id].value;
+			}
 		}
 		break;
 	case 'f':
