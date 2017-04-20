@@ -10,11 +10,6 @@ static ssize_t pwm_chip_init(struct PwmChip *pwm_chip)
 		return PTR_ERR(pwm_chip->device);
 	}
 
-	rc = pwm_config(pwm_chip->device, pwm_chip->duty_cycle, pwm_chip->period);
-	if (rc) {
-		return rc;
-	}
-
 	rc = pwm_enable(pwm_chip->device);
 	if (rc) {
 		return rc;
@@ -110,30 +105,24 @@ static int dev_open(struct inode *inodep, struct file *filep)
 
 static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *offset)
 {
-	int error_count, size_of_message, i;
+	int error_count, size_of_message;
 	char message[256] = {0};
 
-	if (is_read == 1) {
-		return (is_read = 0);
-	}
-
-	for (i = 0; i < PWM_CHIPS_LEN; i++) {
-		if (pwm_chips[i].device != NULL) {
-			sprintf(message + strlen(message), "%u %u %u\n", pwm_chips[i].id, pwm_chips[i].period, pwm_chips[i].duty_cycle);
-		}
-	}
+	sprintf(message, "%u %u", pwm_chips[pwm_id].duty_cycle, pwm_chips[pwm_id].period);
 	size_of_message = strlen(message) + 1;
 
-	error_count = copy_to_user(buffer, message, size_of_message);
+	if (*offset >= size_of_message) {
+		return 0;
+	}
 
-	if (error_count == 0) {
-		printk(KERN_INFO "BBPWM: Sent %d character to the user\n", size_of_message);
-		is_read = 1;
-		return size_of_message;
-	} else {
+	error_count = copy_to_user(buffer, message, size_of_message);
+	if (error_count != 0) {
 		printk(KERN_INFO "BBPWM: Failed to send %d characters to the user\n", error_count);
 		return -EFAULT;
 	}
+
+	*offset += size_of_message;
+	return size_of_message;
 }
 
 static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, loff_t *offset)
@@ -150,25 +139,36 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 
 	sscanf(message, "%c %d %u %u", &choice, &id, &duty_cycle, &period);
 
-	if (id >= 7) {
+	if (id >= 8) {
 		return -EINVAL;
 	}
 
 	switch (choice) {
-	case 's':
+	case 'i':
 		pwm_chips[id].id = id;
-		pwm_chips[id].duty_cycle = duty_cycle;
-		pwm_chips[id].period = period;
 		if (pwm_chips[id].device == NULL) {
 			rc = pwm_chip_init(&pwm_chips[id]);
-		} else {
-			rc = pwm_config(pwm_chips[id].device, pwm_chips[id].duty_cycle, pwm_chips[id].period);
-		}
-		if (rc) {
-			return rc;
+			if (rc) {
+				return rc;
+			}
 		}
 		break;
-	case 'd':
+	case 'r':
+		if (pwm_chips[id].device != NULL) {
+			pwm_id = id;
+		}
+		break;
+	case 'w':
+		if (pwm_chips[id].device != NULL) {
+			pwm_chips[id].duty_cycle = duty_cycle;
+			pwm_chips[id].period = period;
+			rc = pwm_config(pwm_chips[id].device, pwm_chips[id].duty_cycle, pwm_chips[id].period);
+			if (rc) {
+				return rc;
+			}
+		}
+		break;
+	case 'f':
 		if (pwm_chips[id].device != NULL) {
 			pwm_chip_exit(&pwm_chips[id]);
 			pwm_chips[id].device = NULL;

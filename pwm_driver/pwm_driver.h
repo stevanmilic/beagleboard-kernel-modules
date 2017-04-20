@@ -9,7 +9,7 @@
 #define DEVICE_NAME "bbpwm"
 #define CLASS_NAME  "bb"
 
-#define PWM_CHIPS_LEN 7
+#define PWM_CHIPS_LEN 8
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Stevan Milic");
@@ -28,5 +28,6 @@ static void pwm_chip_exit(struct PwmChip *);
 
 static struct PwmChip pwm_chips[PWM_CHIPS_LEN];
 
-static bool is_read = 0;
+static unsigned int pwm_id;
+
 #endif

@@ -170,12 +170,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 			}
 		}
 		break;
-	case 'w':
-		if (gpios[id].exported) {
-			gpios[id].value = param;
-			gpio_set_value(gpios[id].id, gpios[id].value);
-		}
-		break;
 	case 'r':
 		if (gpios[id].exported) {
 			if (!gpios[id].direction) {
@@ -183,6 +177,12 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 			} else {
 				gpio_value = gpios[id].value;
 			}
+		}
+		break;
+	case 'w':
+		if (gpios[id].exported) {
+			gpios[id].value = param;
+			gpio_set_value(gpios[id].id, gpios[id].value);
 		}
 		break;
 	case 'f':
