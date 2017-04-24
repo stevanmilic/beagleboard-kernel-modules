@@ -99,7 +99,6 @@ static int dev_open(struct inode *inodep, struct file *filep)
 		printk(KERN_ALERT "BBPWM: Device in use by another process");
 		return -EBUSY;
 	}
-	printk(KERN_INFO "BBPWM: Device successfully opened\n");
 	return 0;
 }
 
@@ -109,7 +108,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	char message[256] = {0};
 
 	sprintf(message, "%u %u", pwm_chips[pwm_id].duty_cycle, pwm_chips[pwm_id].period);
-	size_of_message = strlen(message) + 1;
+	size_of_message = strlen(message);
 
 	if (*offset >= size_of_message) {
 		return 0;
@@ -182,7 +181,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 static int dev_release(struct inode *inodep, struct file *filep)
 {
 	mutex_unlock(&dev_mutex);
-	printk(KERN_INFO "BBPWM: Device successfully closed\n");
 	return 0;
 }
 

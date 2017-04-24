@@ -70,6 +70,9 @@ static ssize_t gpio_init(struct Gpio *gpio)
 {
 	int rc;
 
+	gpio_unexport(gpio->id);
+	gpio_free(gpio->id);
+
 	if (!gpio_is_valid(gpio->id)) {
 		return -ENODEV;
 	}
@@ -115,7 +118,6 @@ static int dev_open(struct inode *inodep, struct file *filep)
 		printk(KERN_ALERT "BBGPIO: Device in use by another process");
 		return -EBUSY;
 	}
-	printk(KERN_INFO "BBGPIO: Device successfully opened\n");
 	return 0;
 }
 
@@ -125,7 +127,7 @@ static ssize_t dev_read(struct file *filep, char *buffer, size_t len, loff_t *of
 	char message[256] = {0};
 
 	sprintf(message, "%u", gpio_value);
-	size_of_message = strlen(message) + 1;
+	size_of_message = strlen(message);
 
 	if (*offset >= size_of_message){
 			return 0;
@@ -162,7 +164,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	switch (choice) {
 	case 'i':
 		if (!gpios[id].exported) {
-			printk(KERN_INFO "BBGPIO: I am in the (i) branch\n");
 			gpios[id].direction = param;
 			rc = gpio_init(&gpios[id]);
 			if (rc) {
@@ -199,7 +200,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 static int dev_release(struct inode *inodep, struct file *filep)
 {
 	mutex_unlock(&dev_mutex);
-	printk(KERN_INFO "BBGPIO: Device successfully closed\n");
 	return 0;
 }
 

@@ -3,6 +3,12 @@
 from device import Device
 import config
 
+INPUT = 0
+OUTPUT = 1
+
+LOW = 0
+HIGH = 1
+
 
 class Gpio(object):
 
