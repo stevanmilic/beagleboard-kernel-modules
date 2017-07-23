@@ -16,7 +16,8 @@ def enum(**enums):
     return type('Enum', (), enums)
 
 
-Status = enum(ERR=['ERROR', 'Fail'], OK=['OK', 'ready', 'no change', 'SEND OK'])
+Status = enum(ERR=['ERROR', 'Fail'], OK=[
+    'OK', 'ready', 'no change', 'SEND OK'])
 
 
 def main():
@@ -103,7 +104,9 @@ def process_request(uart, led_gpio, state):
     if has_request:
         state = HIGH if state is LOW else LOW
         led_gpio.write(state)
-        response = 'You\'ve changed led\'s state, now it\'s ' + str(state)
+        response = "HTTP/1.1 200 OK\n" + "Content-Type: text/html\n" + \
+            "\n" + '<html><body>You\'ve changed led\'s state, now it\'s ' + \
+            str(state) + '</body></html>\n'
         send_response(uart, response, client_id)
 
     return state
