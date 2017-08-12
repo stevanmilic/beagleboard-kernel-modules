@@ -1,7 +1,7 @@
 """Module for interacting with gpio pins on Beagleboard Black"""
 
-from device import Device
-import config
+from .device import Device
+from . import config
 
 INPUT = 0
 OUTPUT = 1
@@ -14,10 +14,12 @@ class Gpio(object):
 
     """Wrapper class arround kernel module for gpio pins"""
 
+    pid = 0
+
     def __init__(self, pin, direction):
         self.gpio_id = config.PINS[pin]['gpio']
-        command = "{} {} {}".format(
-            config.INIT_OPTION, self.gpio_id, direction)
+        command = "{} {} {} {}".format(
+            config.INIT_OPTION, self.gpio_id, direction, self.pid)
         Device.write(config.GPIO_DEVICE, command)
 
     def read(self):
