@@ -1,4 +1,5 @@
-obj-m := gpio_driver/gpio_driver.o pwm_driver/pwm_driver.o
+obj-m := gpio_driver.o pwm_driver/pwm_driver.o
+gpio_driver-objs = gpio_driver/gpio_driver.o gpio_driver/interrupt.o
 
 ccflags-y += -I$(src)/device
 
@@ -11,6 +12,6 @@ loadpwm:
 unloadpwm:
 	rmmod pwm_driver/pwm_driver.ko
 loadgpio:
-	insmod gpio_driver/gpio_driver.ko
+	insmod gpio_driver.ko
 unloadgpio:
-	rmmod gpio_driver/gpio_driver.ko
+	rmmod gpio_driver.ko

@@ -14,10 +14,10 @@ struct InterruptInfo {
 };
 
 //using only 32-127, 128-238 -> External interrupts(IRQs)
-static struct InterruptInfo interrupts[NUMBER_OF_INTERRUPTS];
+extern struct InterruptInfo interrupts[NUMBER_OF_INTERRUPTS];
 
-static irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs);
+extern irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs);
 
-static ssize_t send_signal(int signal_pid, int int_id);
+extern ssize_t send_signal(int signal_pid, int int_id);
 
 #endif

@@ -1,11 +1,13 @@
 """Module for using esp8266 wifi module with uart pins on the bbb"""
 
 from time import sleep
-from beaglepy.wrappers.uart import Uart
-from beaglepy.wrappers.gpio import Gpio, OUTPUT, LOW, HIGH
+from ..wrappers.uart import Uart
+from ..wrappers.gpio import Gpio, OUTPUT, LOW, HIGH
+from ..wrappers.interrupt import Interrupt
 
 UART_PIN = "UART1"
 EXTERNAL_LED_PIN = 'P8_19'
+INTERRUPT_PIN = 'P9_12'
 
 BAUDRATE = 115200
 PORT = 80
@@ -30,10 +32,11 @@ def main():
     setup_wifi(uart)
 
     external_led_gpio = Gpio(EXTERNAL_LED_PIN, OUTPUT)
-    state = LOW
+
+    interrupt_gpio = Interrupt(INTERRUPT_PIN)
 
     while True:
-        state = process_request(uart, external_led_gpio, state)
+        process_request(uart, interrupt_gpio, external_led_gpio)
         sleep(0.3)
 
     external_led_gpio.free()
@@ -87,7 +90,7 @@ def send_cmd(uart, command, wait_time=1, retry=5):
             break
 
 
-def process_request(uart, led_gpio, state):
+def process_request(uart, interrupt_gpio, led_gpio):
     """Function for processing request from client"""
 
     has_request = False
@@ -101,23 +104,18 @@ def process_request(uart, led_gpio, state):
             has_request = True
             client_id = request[request.find(ipd_str) + len(ipd_str)]
 
-    if has_request:
-        state = HIGH if state is LOW else LOW
-        led_gpio.write(state)
-        response = "HTTP/1.1 200 OK\n" + "Content-Type: text/html\n" + \
-            "\n" + '<html><body>You\'ve changed led\'s state, now it\'s ' + \
-            str(state) + '</body></html>\n'
-        send_response(uart, response, client_id)
-
-    return state
+    if has_request and not interrupt_gpio.attached:
+        print 'Interrupt attached...'
+        interrupt_gpio.attach_interrupt(
+            external_led_handler, uart, led_gpio, client_id)
 
 
-def send_response(uart, response, client_id='0'):
+def send_message(uart, message, client_id='0'):
     """Function for sending response to client"""
 
-    uart.write('AT+CIPSEND=' + client_id + ',' + str(len(response)))
+    uart.write('AT+CIPSEND=' + client_id + ',' + str(len(message)))
     sleep(0.3)
-    uart.write(response)
+    uart.write(message)
     sleep(0.3)
 
     res_sent = False
@@ -135,6 +133,22 @@ def send_response(uart, response, client_id='0'):
     sleep(0.3)
     uart.write('AT+CIPCLOSE=' + client_id)
     sleep(0.3)
+
+
+def external_led_handler(*args):
+    """Method which is triggered when event is detected on interrupt gpio pin
+    """
+    uart = args[0]
+    led_gpio = args[1]
+    client_id = args[2]
+
+    state = HIGH if led_gpio.state is LOW else LOW
+    led_gpio.write(state)
+
+    message = "HTTP/1.1 200 OK\n" + "Content-Type: text/html\n" + \
+        "\n" + '<html><body>You\'ve changed led\'s state, now it\'s ' + \
+        str(state) + '</body></html>\n'
+    send_message(uart, message, client_id)
 
 
 if __name__ == "__main__":

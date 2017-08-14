@@ -18,6 +18,7 @@ class Gpio(object):
 
     def __init__(self, pin, direction):
         self.gpio_id = config.PINS[pin]['gpio']
+        self.state = LOW
         command = "{} {} {} {}".format(
             config.INIT_OPTION, self.gpio_id, direction, self.pid)
         Device.write(config.GPIO_DEVICE, command)
@@ -26,12 +27,20 @@ class Gpio(object):
         """"Method to read a value from gpio pin"""
         command = "{} {}".format(config.READ_OPTION, self.gpio_id)
         Device.write(config.GPIO_DEVICE, command)
-        return Device.read(config.GPIO_DEVICE, 4)
+        read = Device.read(config.GPIO_DEVICE, 4)
+
+        if read == '0':
+            self.state = LOW
+        elif read == '1':
+            self.state = HIGH
+
+        return self.state
 
     def write(self, value):
         """Method to write a value to gpio pin"""
         command = "{} {} {}".format(config.WRITE_OPTION, self.gpio_id, value)
         Device.write(config.GPIO_DEVICE, command)
+        self.state = value
 
     def free(self):
         """Method to free gpio pin from module using it"""

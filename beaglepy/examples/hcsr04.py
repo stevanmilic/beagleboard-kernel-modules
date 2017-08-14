@@ -46,11 +46,11 @@ def echo_pulse(echo_gpio):
     and by that getting the required parametar for calculating the distance
     of the object
     """
-    while echo_gpio.read() == '0':
+    while echo_gpio.read() is LOW:
         pass
 
     start = time()
-    while echo_gpio.read() == '1':
+    while echo_gpio.read() is HIGH:
         pass
     end = time()
 
@@ -68,6 +68,7 @@ def range_cm(pulse_duration):
 def delay_microseconds(delay):
     """A help function for sleeping a thread in microseconds"""
     sleep(delay*MICRO_SECOND)
+
 
 if __name__ == "__main__":
     main()

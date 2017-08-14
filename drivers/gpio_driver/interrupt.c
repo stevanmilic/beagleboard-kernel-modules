@@ -1,5 +1,7 @@
 #include "interrupt.h"
 
+struct InterruptInfo interrupts[NUMBER_OF_INTERRUPTS];
+
 irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs)
 {
 	int pid, rc;
@@ -45,4 +47,5 @@ ssize_t send_signal(int signal_pid, int int_id)
 	return 0;
 }
 
+EXPORT_SYMBOL(interrupts);
 EXPORT_SYMBOL(dev_irq_handler);

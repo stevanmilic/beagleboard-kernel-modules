@@ -1,6 +1,6 @@
 #include "gpio_driver.h"
 #include "device.h"
-#include "interrupt.h"
+/* #include "interrupt.h" */
 
 static ssize_t __init gpio_driver_init(void)
 {
@@ -18,7 +18,7 @@ static ssize_t __init gpio_driver_init(void)
 		gpios[i].irq = 0;
 	}
 
-	for(i = 0; i < NUMBER_OF_INTERRUPTS; i++) {
+	for (i = 0; i < NUMBER_OF_INTERRUPTS; i++) {
 		interrupts[i].signal_pid = 0;
 		interrupts[i].int_id = 0;
 	}
@@ -99,11 +99,25 @@ static ssize_t gpio_init(struct Gpio *gpio, int pid)
 	}
 
 	if (pid) {
+		gpio_set_debounce(gpio->id, 200);
+	}
+
+	rc = gpio_export(gpio->id, 0);
+	if (rc) {
+		return rc;
+	}
+
+	gpio->exported = 1;
+
+	if (pid) {
 
 		int irq = gpio_to_irq(gpio->id);
 		if (irq < 0) {
 			return irq;
 		}
+
+		interrupts[irq].int_id = gpio->id;
+		interrupts[irq].signal_pid = pid;
 
 		gpio->irq = irq;
 
@@ -113,16 +127,7 @@ static ssize_t gpio_init(struct Gpio *gpio, int pid)
 		}
 
 		printk(KERN_INFO "BBGPIO: The interrupt request result is: %d\n", rc);
-		interrupts[irq].int_id = gpio->id;
-		interrupts[irq].signal_pid = pid;
 	}
-
-	rc = gpio_export(gpio->id, 0);
-	if (rc) {
-		return rc;
-	}
-
-	gpio->exported = 1;
 
 	printk(KERN_INFO "BBGPIO: GPIO with Id: %u Value: %u Direction: %u IRQ : %d configured\n", gpio->id, gpio->value, gpio->direction, gpio->irq);
 
@@ -135,7 +140,7 @@ static void gpio_exit(struct Gpio *gpio)
 	gpio_unexport(gpio->id);
 	gpio_free(gpio->id);
 	gpio->exported = 0;
-	if(interrupts[gpio->irq].signal_pid > 0) {
+	if (interrupts[gpio->irq].signal_pid > 0) {
 		free_irq(gpio->irq, NULL);
 		interrupts[gpio->irq].signal_pid = 0;
 	}
@@ -231,51 +236,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 static int dev_release(struct inode *inodep, struct file *filep)
 {
 	mutex_unlock(&dev_mutex);
-	return 0;
-}
-
-static irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs)
-{
-	int pid, rc;
-	unsigned int id;
-
-	printk(KERN_INFO "BBGPIO: IRQ received: %d\n", irq);
-
-	pid = interrupts[irq].signal_pid;
-	id = interrupts[irq].int_id;
-
-	rc = send_signal(pid, id);
-	if(rc) {
-		return IRQ_NONE;
-	}
-
-	return (irq_handler_t) IRQ_HANDLED;
-}
-
-static ssize_t send_signal(int signal_pid, int int_id)
-{
-	struct siginfo info;
-	struct task_struct *t;
-
-	memset(&info, 0, sizeof(struct siginfo));
-
-	info.si_signo = SIGIO;
-	info.si_int = int_id;
-	info.si_code = SI_QUEUE;
-
-	printk(KERN_INFO "BBGPIO: Searching for task id: %d\n", signal_pid);
-
-	rcu_read_lock();
-	t = pid_task(find_vpid(signal_pid), PIDTYPE_PID);
-	rcu_read_unlock();
-
-	if (t == NULL) {
-		printk(KERN_INFO "BBGPIO: No such pid, cannot send signal\n");
-		return -ENODEV;
-	}
-
-	printk(KERN_INFO "BBGPIO: Found the task, sending signal");
-	send_sig_info(SIGIO, &info, t);
 	return 0;
 }
 

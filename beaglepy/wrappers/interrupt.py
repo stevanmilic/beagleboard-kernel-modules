@@ -15,18 +15,20 @@ class Interrupt(Gpio):
 
     def __init__(self, pin):
         self.pid = os.getpid()
+        self.attached = False
         super(Interrupt, self).__init__(pin, INPUT)
 
-    def attach_interrupt(self, interrupt_handler):
+    def attach_interrupt(self, interrupt_handler, *args):
         """Method to attach interrupt on handler passed as reference,
         local method is used to detect signal from device
         """
+
+        self.attached = True
 
         def handler(signum, frame):
             """Local method to call handler passed by user
             for specific gpio pin"""
             print 'Signal handler called with signal', signum
-            # if frame.id == self.gpio_id:
-            interrupt_handler()
+            interrupt_handler(*args)
 
         signal.signal(signal.SIGIO, handler)
