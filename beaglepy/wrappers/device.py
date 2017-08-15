@@ -1,6 +1,7 @@
 """Module for interacting with linux device"""
 
 import os
+import select
 
 
 class Device(object):
@@ -22,6 +23,16 @@ class Device(object):
         output = os.write(device, command)
         os.close(device)
         return output
+
+    @staticmethod
+    def poll(name, eventmask):
+        """Method for polling device"""
+        device = os.open(Device._path(name), os.O_RDONLY)
+        poll = select.poll()
+        poll.register(device, eventmask)
+        poll.poll()
+        poll.unregister(device)
+        os.close(device)
 
     @staticmethod
     def _path(name):

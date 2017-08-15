@@ -5,7 +5,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/gpio.h>
-#include <linux/interrupt.h>
 #include <asm/uaccess.h>
 #include "interrupt.h"
 
@@ -29,7 +28,7 @@ struct Gpio {
 	bool exported;
 };
 
-static ssize_t gpio_init(struct Gpio *, int pid);
+static ssize_t gpio_init(struct Gpio *);
 static void gpio_exit(struct Gpio *);
 
 static struct Gpio gpios[GPIOS_LEN];

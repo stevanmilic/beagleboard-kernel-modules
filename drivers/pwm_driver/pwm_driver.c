@@ -178,6 +178,12 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	return len;
 }
 
+static unsigned int dev_poll(struct file *filep, struct poll_table_struct *wait)
+{
+	/* not implemented */
+	return 0;
+}
+
 static int dev_release(struct inode *inodep, struct file *filep)
 {
 	mutex_unlock(&dev_mutex);

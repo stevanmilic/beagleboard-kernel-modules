@@ -2,22 +2,17 @@
 #define _interrupt_h_
 
 #include <linux/interrupt.h>
-#include <asm/siginfo.h>
-#include <linux/rcupdate.h>
 #include <linux/sched.h>
+#include <linux/poll.h>
+#include <linux/wait.h>
 
 #define NUMBER_OF_INTERRUPTS 256
 
-struct InterruptInfo {
-	unsigned int int_id;
-	int signal_pid;
-};
+static unsigned int gpio_irq_data = 0;
+static unsigned int interrupts[NUMBER_OF_INTERRUPTS];
 
-//using only 32-127, 128-238 -> External interrupts(IRQs)
-extern struct InterruptInfo interrupts[NUMBER_OF_INTERRUPTS];
+static DECLARE_WAIT_QUEUE_HEAD(gpio_wait);
 
-extern irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs);
-
-extern ssize_t send_signal(int signal_pid, int int_id);
+static irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs);
 
 #endif

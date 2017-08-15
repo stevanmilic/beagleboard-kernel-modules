@@ -2,9 +2,8 @@
 wtih gpio pins on Beagleboard Black
 """
 
-import os
-import signal
-from .gpio import Gpio, INPUT
+import threading
+from .gpio import Gpio, INPUT, Device, config
 
 
 class Interrupt(Gpio):
@@ -14,9 +13,9 @@ class Interrupt(Gpio):
     """
 
     def __init__(self, pin):
-        self.pid = os.getpid()
-        self.attached = False
         super(Interrupt, self).__init__(pin, INPUT)
+        self.attached = False
+        self.mask = self.gpio_id
 
     def attach_interrupt(self, interrupt_handler, *args):
         """Method to attach interrupt on handler passed as reference,
@@ -25,10 +24,16 @@ class Interrupt(Gpio):
 
         self.attached = True
 
-        def handler(signum, frame):
-            """Local method to call handler passed by user
-            for specific gpio pin"""
-            print 'Signal handler called with signal', signum
-            interrupt_handler(*args)
+        thread = threading.Thread(
+            target=self.poll_gpio, args=(interrupt_handler, args))
+        thread.deamon = True
+        thread.start()
 
-        signal.signal(signal.SIGIO, handler)
+    def poll_gpio(self, interrupt_handler, args):
+        """Method to poll device until change on gpio is happened,
+        and thus triggering attached handler function
+        """
+        while True:
+            Device.poll(config.GPIO_DEVICE, self.mask)
+
+            interrupt_handler(*args)

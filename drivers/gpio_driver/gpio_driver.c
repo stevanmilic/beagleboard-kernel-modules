@@ -1,6 +1,5 @@
 #include "gpio_driver.h"
 #include "device.h"
-/* #include "interrupt.h" */
 
 static ssize_t __init gpio_driver_init(void)
 {
@@ -16,11 +15,6 @@ static ssize_t __init gpio_driver_init(void)
 		gpios[i].id = i;
 		gpios[i].value = 0;
 		gpios[i].irq = 0;
-	}
-
-	for (i = 0; i < NUMBER_OF_INTERRUPTS; i++) {
-		interrupts[i].signal_pid = 0;
-		interrupts[i].int_id = 0;
 	}
 
 	return 0;
@@ -73,7 +67,7 @@ static void dev_exit(void)
 	printk(KERN_INFO "BBGPIO: device has been unregistered\n");
 }
 
-static ssize_t gpio_init(struct Gpio *gpio, int pid)
+static ssize_t gpio_init(struct Gpio *gpio)
 {
 	int rc;
 
@@ -91,15 +85,12 @@ static ssize_t gpio_init(struct Gpio *gpio, int pid)
 
 	if (!gpio->direction) {
 		rc = gpio_direction_input(gpio->id);
+		gpio_set_debounce(gpio->id, 200);
 	} else {
 		rc = gpio_direction_output(gpio->id, gpio->value);
 	}
 	if (rc) {
 		return rc;
-	}
-
-	if (pid) {
-		gpio_set_debounce(gpio->id, 200);
 	}
 
 	rc = gpio_export(gpio->id, 0);
@@ -109,17 +100,15 @@ static ssize_t gpio_init(struct Gpio *gpio, int pid)
 
 	gpio->exported = 1;
 
-	if (pid) {
+	if (!gpio->direction) {
 
 		int irq = gpio_to_irq(gpio->id);
 		if (irq < 0) {
 			return irq;
 		}
 
-		interrupts[irq].int_id = gpio->id;
-		interrupts[irq].signal_pid = pid;
-
 		gpio->irq = irq;
+		interrupts[gpio->irq] = gpio->id;
 
 		rc = request_irq(gpio->irq, (irq_handler_t) dev_irq_handler, IRQF_TRIGGER_HIGH, "bbb_gpio_handler", NULL);
 		if (rc) {
@@ -140,9 +129,10 @@ static void gpio_exit(struct Gpio *gpio)
 	gpio_unexport(gpio->id);
 	gpio_free(gpio->id);
 	gpio->exported = 0;
-	if (interrupts[gpio->irq].signal_pid > 0) {
+	if (gpio->irq > 0) {
 		free_irq(gpio->irq, NULL);
-		interrupts[gpio->irq].signal_pid = 0;
+		gpio->irq = 0;
+		interrupts[gpio->irq] = 0;
 	}
 	printk(KERN_INFO "BBGPIO: GPIO with Id: %u freed\n", gpio->id);
 }
@@ -183,7 +173,6 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	int rc, error_count;
 	char message[256] = {0}, choice;
 	unsigned int id, param;
-	int pid;
 
 	error_count = copy_from_user(message, buffer, len);
 	if (error_count != 0) {
@@ -191,7 +180,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 		return -EFAULT;
 	}
 
-	sscanf(message, "%c %u %u %d", &choice, &id, &param, &pid);
+	sscanf(message, "%c %u %u", &choice, &id, &param);
 
 	if (id >= 65) {
 		return -EINVAL;
@@ -201,7 +190,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	case 'i':
 		if (!gpios[id].exported) {
 			gpios[id].direction = param;
-			rc = gpio_init(&gpios[id], pid);
+			rc = gpio_init(&gpios[id]);
 			if (rc) {
 				return rc;
 			}
@@ -231,6 +220,31 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	}
 
 	return len;
+}
+
+static unsigned int dev_poll(struct file *filep, struct poll_table_struct *wait)
+{
+	poll_wait(filep, &gpio_wait, wait);
+
+	if(gpio_irq_data) {
+		unsigned int l = gpio_irq_data;
+		gpio_irq_data = 0;
+		return l;
+	}
+
+	return 0; 
+}
+
+static irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs)
+{
+	unsigned int gpio_id;
+
+	gpio_id = interrupts[irq];
+	gpio_irq_data = gpio_id;
+
+	wake_up_interruptible(&gpio_wait);
+
+	return (irq_handler_t) IRQ_HANDLED;
 }
 
 static int dev_release(struct inode *inodep, struct file *filep)

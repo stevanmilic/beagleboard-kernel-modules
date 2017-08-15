@@ -14,13 +14,11 @@ class Gpio(object):
 
     """Wrapper class arround kernel module for gpio pins"""
 
-    pid = 0
-
     def __init__(self, pin, direction):
         self.gpio_id = config.PINS[pin]['gpio']
         self.state = LOW
-        command = "{} {} {} {}".format(
-            config.INIT_OPTION, self.gpio_id, direction, self.pid)
+        command = "{} {} {}".format(
+            config.INIT_OPTION, self.gpio_id, direction)
         Device.write(config.GPIO_DEVICE, command)
 
     def read(self):
