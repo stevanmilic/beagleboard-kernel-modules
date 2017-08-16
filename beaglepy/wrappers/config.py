@@ -4,8 +4,8 @@ INIT_OPTION = 'i'
 READ_OPTION = 'r'
 WRITE_OPTION = 'w'
 FREE_OPTION = 'f'
-GPIO_DEVICE = 'bbgpio'
-PWM_DEVICE = 'bbpwm'
+GPIO_DEVICE = '/dev/bbgpio'
+PWM_DEVICE = '/dev/bbpwm'
 
 PINS = {}
 

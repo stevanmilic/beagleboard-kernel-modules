@@ -85,7 +85,7 @@ static ssize_t gpio_init(struct Gpio *gpio)
 
 	if (!gpio->direction) {
 		rc = gpio_direction_input(gpio->id);
-		gpio_set_debounce(gpio->id, 200);
+		/* gpio_set_debounce(gpio->id, 200); */
 	} else {
 		rc = gpio_direction_output(gpio->id, gpio->value);
 	}
@@ -100,7 +100,7 @@ static ssize_t gpio_init(struct Gpio *gpio)
 
 	gpio->exported = 1;
 
-	if (!gpio->direction) {
+	if (!gpio->direction && gpio->mask) {
 
 		int irq = gpio_to_irq(gpio->id);
 		if (irq < 0) {
@@ -129,11 +129,22 @@ static void gpio_exit(struct Gpio *gpio)
 	gpio_unexport(gpio->id);
 	gpio_free(gpio->id);
 	gpio->exported = 0;
+
 	if (gpio->irq > 0) {
+
 		free_irq(gpio->irq, NULL);
 		gpio->irq = 0;
 		interrupts[gpio->irq] = 0;
+
+		gpio_irq_data |= gpio->mask;
+		gpio_last_mask = gpio->mask;
+
+		wake_up_interruptible(&gpio_wait);
+
+		gpio->mask = 0;
+
 	}
+
 	printk(KERN_INFO "BBGPIO: GPIO with Id: %u freed\n", gpio->id);
 }
 
@@ -173,6 +184,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	int rc, error_count;
 	char message[256] = {0}, choice;
 	unsigned int id, param;
+	unsigned int mask;
 
 	error_count = copy_from_user(message, buffer, len);
 	if (error_count != 0) {
@@ -180,7 +192,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 		return -EFAULT;
 	}
 
-	sscanf(message, "%c %u %u", &choice, &id, &param);
+	sscanf(message, "%c %u %u %u", &choice, &id, &param, &mask);
 
 	if (id >= 65) {
 		return -EINVAL;
@@ -190,6 +202,7 @@ static ssize_t dev_write(struct file *filep, const char *buffer, size_t len, lof
 	case 'i':
 		if (!gpios[id].exported) {
 			gpios[id].direction = param;
+			gpios[id].mask = mask;
 			rc = gpio_init(&gpios[id]);
 			if (rc) {
 				return rc;
@@ -228,7 +241,7 @@ static unsigned int dev_poll(struct file *filep, struct poll_table_struct *wait)
 
 	if(gpio_irq_data) {
 		unsigned int l = gpio_irq_data;
-		gpio_irq_data = 0;
+		gpio_irq_data &= ~gpio_last_mask;
 		return l;
 	}
 
@@ -240,7 +253,8 @@ static irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_
 	unsigned int gpio_id;
 
 	gpio_id = interrupts[irq];
-	gpio_irq_data = gpio_id;
+	gpio_irq_data |= gpios[gpio_id].mask;
+	gpio_last_mask = gpios[gpio_id].mask;
 
 	wake_up_interruptible(&gpio_wait);
 

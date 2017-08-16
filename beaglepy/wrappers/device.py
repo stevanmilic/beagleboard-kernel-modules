@@ -1,39 +1,37 @@
-"""Module for interacting with linux device"""
+"""Module with interface for char device(driver)"""
 
+from abc import ABCMeta, abstractmethod
 import os
 import select
 
 
 class Device(object):
+    """Abstract interface for char device"""
 
-    """Interface for reading and writing to device"""
+    __metaclass__ = ABCMeta
 
-    @staticmethod
-    def read(name, no_bytes):
-        """Method for reading from device"""
-        device = os.open(Device._path(name), os.O_RDONLY)
-        output = os.read(device, no_bytes)
-        os.close(device)
+    def read(self, no_bytes):
+        """Method for reading from self.get_fd()"""
+        output = os.read(self.get_fd(), no_bytes)
         return output
 
-    @staticmethod
-    def write(name, command):
-        """Method for writing to device"""
-        device = os.open(Device._path(name), os.O_WRONLY)
-        output = os.write(device, command)
-        os.close(device)
+    def write(self, command):
+        """Method for writing to self.get_fd()"""
+        output = os.write(self.get_fd(), command)
         return output
 
-    @staticmethod
-    def poll(name, eventmask):
-        """Method for polling device"""
-        device = os.open(Device._path(name), os.O_RDONLY)
+    def poll(self, eventmask):
+        """Method for polling self.get_fd()"""
         poll = select.poll()
-        poll.register(device, eventmask)
+        poll.register(self.get_fd(), eventmask)
         poll.poll()
-        poll.unregister(device)
-        os.close(device)
+        poll.unregister(self.get_fd())
 
-    @staticmethod
-    def _path(name):
-        return '/dev/' + name
+    def close(self):
+        """Method to close file descriptor"""
+        os.close(self.get_fd())
+
+    @abstractmethod
+    def get_fd(self):
+        """Abstract method to get file descriptor"""
+        raise NotImplementedError('Method \'get_fd\' must be implemented')

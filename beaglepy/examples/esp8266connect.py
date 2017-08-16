@@ -1,6 +1,8 @@
 """Module for using esp8266 wifi module with uart pins on the bbb"""
 
 from time import sleep
+import signal
+import sys
 from ..wrappers.uart import Uart
 from ..wrappers.gpio import Gpio, OUTPUT, LOW, HIGH
 from ..wrappers.interrupt import Interrupt
@@ -35,12 +37,18 @@ def main():
 
     interrupt_gpio = Interrupt(INTERRUPT_PIN)
 
+    def signal_handler(signal, frame):
+        """Handler for ctrl+c interrupt - program ends"""
+        external_led_gpio.free()
+        uart.free()
+        interrupt_gpio.free()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     while True:
         process_request(uart, interrupt_gpio, external_led_gpio)
         sleep(0.3)
-
-    external_led_gpio.free()
-    uart.free()
 
 
 def setup_wifi(uart):

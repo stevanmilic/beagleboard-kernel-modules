@@ -1,6 +1,6 @@
 """Module for interacting with gpio pins on Beagleboard Black"""
 
-from .device import Device
+from .gpio_device import GpioDevice
 from . import config
 
 INPUT = 0
@@ -15,17 +15,21 @@ class Gpio(object):
     """Wrapper class arround kernel module for gpio pins"""
 
     def __init__(self, pin, direction):
-        self.gpio_id = config.PINS[pin]['gpio']
+        self._gpio_id = config.PINS[pin]['gpio']
         self.state = LOW
-        command = "{} {} {}".format(
-            config.INIT_OPTION, self.gpio_id, direction)
-        Device.write(config.GPIO_DEVICE, command)
+        self.device = GpioDevice.instance()
+        command = self.get_init_command(direction)
+        self.device.write(command)
+
+    def get_init_command(self, direction):
+        """Method for producing command for init the device"""
+        return "{} {} {} {}".format(config.INIT_OPTION, self._gpio_id, direction, 0)
 
     def read(self):
         """"Method to read a value from gpio pin"""
-        command = "{} {}".format(config.READ_OPTION, self.gpio_id)
-        Device.write(config.GPIO_DEVICE, command)
-        read = Device.read(config.GPIO_DEVICE, 4)
+        command = "{} {}".format(config.READ_OPTION, self._gpio_id)
+        self.device.write(command)
+        read = self.device.read(4)
 
         if read == '0':
             self.state = LOW
@@ -36,11 +40,11 @@ class Gpio(object):
 
     def write(self, value):
         """Method to write a value to gpio pin"""
-        command = "{} {} {}".format(config.WRITE_OPTION, self.gpio_id, value)
-        Device.write(config.GPIO_DEVICE, command)
+        command = "{} {} {}".format(config.WRITE_OPTION, self._gpio_id, value)
+        self.device.write(command)
         self.state = value
 
     def free(self):
         """Method to free gpio pin from module using it"""
-        command = "{} {}".format(config.FREE_OPTION, self.gpio_id)
-        Device.write(config.GPIO_DEVICE, command)
+        command = "{} {}".format(config.FREE_OPTION, self._gpio_id)
+        self.device.write(command)

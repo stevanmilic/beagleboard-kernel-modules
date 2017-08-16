@@ -3,7 +3,8 @@ wtih gpio pins on Beagleboard Black
 """
 
 import threading
-from .gpio import Gpio, INPUT, Device, config
+import itertools
+from .gpio import Gpio, INPUT, config
 
 
 class Interrupt(Gpio):
@@ -12,10 +13,16 @@ class Interrupt(Gpio):
     is attached to gpio pin, Gpio class is inherited
     """
 
+    posid = itertools.count().next
+
     def __init__(self, pin):
-        super(Interrupt, self).__init__(pin, INPUT)
         self.attached = False
-        self.mask = self.gpio_id
+        self._mask = 1 << Interrupt.posid()
+        super(Interrupt, self).__init__(pin, INPUT)
+
+    def get_init_command(self, direction):
+        """Method for producing command for init the device"""
+        return "{} {} {} {}".format(config.INIT_OPTION, self._gpio_id, direction, self._mask)
 
     def attach_interrupt(self, interrupt_handler, *args):
         """Method to attach interrupt on handler passed as reference,
@@ -33,7 +40,13 @@ class Interrupt(Gpio):
         """Method to poll device until change on gpio is happened,
         and thus triggering attached handler function
         """
-        while True:
-            Device.poll(config.GPIO_DEVICE, self.mask)
+        while self.attached:
+            self.device.poll(self._mask)
 
-            interrupt_handler(*args)
+            if self.attached:
+                interrupt_handler(*args)
+
+    def free(self):
+        """Override base class method to break polling"""
+        self.attached = False
+        super(Interrupt, self).free()

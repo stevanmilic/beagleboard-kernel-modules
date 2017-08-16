@@ -1,8 +1,8 @@
 """Module for interacting with pwm pins on Beagleboard Black"""
 
 import os
-import config
-from device import Device
+from . import config
+from .pwm_device import PwmDevice
 
 NANO_SECOND = float(10**9)
 
@@ -14,15 +14,16 @@ class Pwm(object):
     def __init__(self, pin):
         self._config_pin_to_pwm(pin)
         self.pwm_id = self._get_pwm_chip_id(pin)
+        self.device = PwmDevice.instance()
         command = '{} {}'.format(
             config.INIT_OPTION, self.pwm_id)
-        Device.write(config.PWM_DEVICE, command)
+        self.device.write(command)
 
     def read(self):
         """"Method to read duty_cycle and period from pwm pin"""
         command = "{} {}".format(config.READ_OPTION, self.pwm_id)
-        Device.write(config.PWM_DEVICE, command)
-        return Device.read(config.PWM_DEVICE, 32)
+        self.device.write(command)
+        return self.device.read(32)
 
     def write(self, duty_percent, frequency):
         """Method to write duty_percent and frequency to pwm pin,
@@ -33,12 +34,12 @@ class Pwm(object):
         duty_cycle = int(round(period * duty_percent))
         command = '{} {} {} {}'.format(
             config.WRITE_OPTION, self.pwm_id, duty_cycle, period)
-        Device.write(config.PWM_DEVICE, command)
+        self.device.write(command)
 
     def free(self):
         """Method to free pwm pin from module using it"""
         command = "{} {}".format(config.FREE_OPTION, self.pwm_id)
-        Device.write(config.PWM_DEVICE, command)
+        self.device.write(command)
 
     @staticmethod
     def _config_pin_to_pwm(pin):

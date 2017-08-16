@@ -25,6 +25,7 @@ struct Gpio {
 	unsigned int value;
 	unsigned int direction;
 	unsigned int irq;
+	unsigned int mask;
 	bool exported;
 };
 
