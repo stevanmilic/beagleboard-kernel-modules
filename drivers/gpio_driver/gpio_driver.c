@@ -115,6 +115,9 @@ static ssize_t gpio_init(struct Gpio *gpio)
 			return rc;
 		}
 
+		gpio_interrupt_counter++;
+		gpio_poll_counter = gpio_interrupt_counter;
+
 		printk(KERN_INFO "BBGPIO: The interrupt request result is: %d\n", rc);
 	}
 
@@ -139,8 +142,9 @@ static void gpio_exit(struct Gpio *gpio)
 		gpio_irq_data |= gpio->mask;
 		gpio_last_mask = gpio->mask;
 
-		wake_up_interruptible(&gpio_wait);
+		wake_up_interruptible_all(&gpio_wait);
 
+		gpio_interrupt_counter--;
 		gpio->mask = 0;
 
 	}
@@ -239,13 +243,20 @@ static unsigned int dev_poll(struct file *filep, struct poll_table_struct *wait)
 {
 	poll_wait(filep, &gpio_wait, wait);
 
-	if(gpio_irq_data) {
-		unsigned int l = gpio_irq_data;
-		gpio_irq_data &= ~gpio_last_mask;
-		return l;
+	printk(KERN_INFO "BBGPIO: Poll function continued with data: %u\n", gpio_irq_data);
+	if (gpio_irq_data) {
+		printk(KERN_INFO "BBGPIO: Poll counter: %d\n", --gpio_poll_counter);
+		if (gpio_poll_counter <= 0) {
+			unsigned int l = gpio_irq_data;
+			gpio_irq_data &= ~gpio_last_mask;
+			gpio_poll_counter = gpio_interrupt_counter;
+			return l;
+		} else {
+			return gpio_irq_data;
+		}
 	}
 
-	return 0; 
+	return 0;
 }
 
 static irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs)
@@ -256,7 +267,7 @@ static irq_handler_t  dev_irq_handler(unsigned int irq, void *dev_id, struct pt_
 	gpio_irq_data |= gpios[gpio_id].mask;
 	gpio_last_mask = gpios[gpio_id].mask;
 
-	wake_up_interruptible(&gpio_wait);
+	wake_up_interruptible_all(&gpio_wait);
 
 	return (irq_handler_t) IRQ_HANDLED;
 }

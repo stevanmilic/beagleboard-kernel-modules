@@ -7,7 +7,7 @@
 #include <asm/uaccess.h>
 
 #define DEVICE_NAME "bbpwm"
-#define CLASS_NAME  "bb"
+#define CLASS_NAME  "bb2"
 
 #define PWM_CHIPS_LEN 8
 

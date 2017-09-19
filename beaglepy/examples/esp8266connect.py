@@ -14,12 +14,23 @@ import signal
 import sys
 from ..wrappers.uart import Uart
 from ..wrappers.gpio import Gpio, OUTPUT, LOW, HIGH
+from ..wrappers.pwm import Pwm
 from ..wrappers.interrupt import Interrupt
 
-UART_PIN = "UART1"
+UART_PIN = 'UART1'
+
 EXTERNAL_LED_PIN = 'P8_19'
 INTERRUPT_PIN = 'P9_12'
+SERVO_PWM_PIN = 'P9_14'
 
+# servo motor config
+FREQUENCY = 60  # Hz
+DUTY_MIN = 0.03  # %
+DUTY_MAX = 0.115  # %
+
+INCREMENT = 0.1
+
+# wifi module config
 BAUDRATE = 115200
 PORT = 5000
 
@@ -45,24 +56,33 @@ def main():
     uart = Uart(uart_pin, BAUDRATE)
     setup_wifi(uart)
 
-    # external_led_gpio = Gpio(EXTERNAL_LED_PIN, OUTPUT)
-    external_led_gpio = None
+    led_gpio = None
+    led_interrupt = None
 
-    # interrupt_gpio = Interrupt(INTERRUPT_PIN)
-    interrupt_gpio = None
+    servo_pwm = None
+    servo_position = 0
+    servo_interrupt = None
 
     def signal_handler(signum, frame):
         """Handler for ctrl+c interrupt - program ends"""
-        external_led_gpio.free()
         uart.free()
-        interrupt_gpio.free()
+
+        if led_gpio is not None:
+            led_gpio.free()
+        if led_interrupt is not None:
+            led_interrupt.free()
+        if servo_pwm is not None:
+            servo_pwm.free()
+        if servo_interrupt is not None:
+            servo_interrupt.free()
+
         sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
 
     while True:
-        (external_led_gpio, interrupt_gpio) = process_request(
-            uart, interrupt_gpio, external_led_gpio)
+        (led_gpio, led_interrupt, servo_pwm, servo_position, servo_interrupt) = process_request(
+            uart, led_interrupt, led_gpio, servo_pwm, servo_position, servo_interrupt)
         sleep(0.3)
 
 
@@ -116,7 +136,7 @@ def send_cmd(uart, command, wait_time=1, retry=5):
             break
 
 
-def process_request(uart, interrupt_gpio, led_gpio):
+def process_request(uart, led_interrupt, led_gpio, servo_pwm, servo_position, servo_interrupt):
     """Function for processing request from client"""
 
     has_request = False
@@ -129,18 +149,26 @@ def process_request(uart, interrupt_gpio, led_gpio):
             has_request = True
             data = search(':(.*)0,CLOSED', request).group(1)
             (pin_type, pin_id, pin_value) = [
-                t(s) for t, s in zip((str, str, int), data.split())]
+                t(s) for t, s in zip((str, str, float), data.split())]
 
     if has_request:
         if pin_type == 'l':
             led_gpio = Gpio(pin_id, OUTPUT) if led_gpio is None else led_gpio
-            led_gpio.write(pin_value)
-        elif pin_type == 'i' and led_gpio is not None:
-            interrupt_gpio = Interrupt(pin_id)
-            interrupt_gpio.attach_interrupt(external_led_handler, led_gpio)
-            print 'Interrupt attached on pin ' + pin_id
+            led_gpio.write(int(pin_value))
+        elif pin_type == 's':
+            servo_pwm = Pwm(pin_id) if servo_pwm is None else servo_pwm
+            servo_position = move_servo(servo_pwm, servo_position, pin_value)
+        elif pin_type == 'il' and led_gpio is not None:
+            led_interrupt = Interrupt(pin_id)
+            led_interrupt.attach_interrupt(external_led_handler, led_gpio)
+            print 'Interrupt for led diode attached on pin ' + pin_id
+        elif pin_type == 'is' and servo_pwm is not None:
+            servo_interrupt = Interrupt(pin_id)
+            servo_interrupt.attach_interrupt(
+                servo_motor_handler, servo_pwm, servo_position)
+            print 'Interrupt for servo motor attached on pin ' + pin_id
 
-    return (led_gpio, interrupt_gpio)
+    return (led_gpio, led_interrupt, servo_pwm, servo_position, servo_interrupt)
 
 
 def send_message(uart, message, client_id='0'):
@@ -177,6 +205,29 @@ def external_led_handler(*args):
     led_gpio.write(state)
 
     print 'Interrupt detected... Led value is ' + str(state) + ' now'
+
+
+def servo_motor_handler(*args):
+    """Method which is triggered when event is detected on interrupt gpio pin
+    assigned to control servo motor
+    """
+
+    servo_pwm = args[0]
+    servo_position = args[1]
+
+    servo_position = move_servo(servo_pwm, servo_position, 0)
+
+    print 'Interrupt detected... Servo position is ' + str(servo_position) + ' now'
+
+
+def move_servo(servo_pwm, servo_position, increment):
+    """Help method to move servo motor for increment specified"""
+    if servo_position >= 1:
+        servo_position = 0
+    duty_percent = (servo_position * DUTY_MAX) + DUTY_MIN
+    servo_pwm.write(duty_percent, FREQUENCY)
+    servo_position += increment
+    return servo_position
 
 
 if __name__ == "__main__":
